@@ -30,8 +30,8 @@ const MasterFlowInputSchema = z.object({
 export type MasterFlowInput = z.infer<typeof MasterFlowInputSchema>;
 
 // --- CONFIGURATION ---
-const DEFAULT_GDB_PATH = '/Users/harrisonlane/Downloads/MassGIS_L3_Parcels_gdb/MassGIS_L3_Parcels.gdb'; 
-const GDB_PATH = process.env.GDB_PATH_OVERRIDE || DEFAULT_GDB_PATH;
+const DEFAULT_GDB_PATH = ''; // Or '/opt/data/MassGIS_L3_Parcels.gdb' or a path relevant to a potential containerized environment
+const GDB_PATH = process.env.GDB_PATH || DEFAULT_GDB_PATH;
 
 const MIN_GDB_CONFIDENCE_THRESHOLD = 0.8; // Minimum confidence to consider GDB data primary
 
@@ -112,6 +112,9 @@ export const masterReportGenerationFlow = defineFlow(
       // 1. Data Extraction - Phase 1: Local GDB Query
       let gdbSucceeded = false;
       if (caseFile.state.toUpperCase() === 'MA') { // Only attempt GDB query for MA properties
+        if (!GDB_PATH) {
+          console.warn(`[${caseFile.reportId}] Warning: GDB_PATH environment variable is not set. Local GIS data extraction for MA properties will be skipped or may fail.`);
+        }
         try {
           const gdbInput: z.infer<typeof LocalGisDataToolInputSchema> = {
             gdbPath: GDB_PATH,
@@ -126,11 +129,11 @@ export const masterReportGenerationFlow = defineFlow(
           caseFile.metaData!.gdbMatchConfidence = gdbResult.matchConfidence;
 
           if (gdbResult.error) {
-            console.warn(`GDB Extraction Error: ${gdbResult.error}`);
+            console.warn(`[${caseFile.reportId}] GDB Extraction Error: ${gdbResult.error}`);
             caseFile.metaData!.gdbQueryStatus = 'ERROR';
             caseFile.metaData!.gdbErrorMessage = gdbResult.error;
           } else if (gdbResult.data && gdbResult.matchConfidence && gdbResult.matchConfidence >= MIN_GDB_CONFIDENCE_THRESHOLD) {
-            console.log(`GDB Extraction Successful (Confidence: ${gdbResult.matchConfidence})`);
+            console.log(`[${caseFile.reportId}] GDB Extraction Successful (Confidence: ${gdbResult.matchConfidence})`);
             caseFile.metaData!.gdbQueryStatus = 'SUCCESS';
             caseFile.metaData!.propertyDataSourcePrimary = 'GDB';
             // Merge GDB data into caseFile.propertyDetails
@@ -180,22 +183,22 @@ export const masterReportGenerationFlow = defineFlow(
             };
             gdbSucceeded = true;
           } else {
-            console.log(`GDB data found but confidence low (${gdbResult.matchConfidence}) or data missing.`);
+            console.log(`[${caseFile.reportId}] GDB data found but confidence low (${gdbResult.matchConfidence}) or data missing.`);
             caseFile.metaData!.gdbQueryStatus = 'NOT_FOUND'; // Or 'LOW_CONFIDENCE'
           }
         } catch (err: any) {
-          console.error('Error running localGisDataTool:', err);
+          console.error(`[${caseFile.reportId}] Error running localGisDataTool:`, err);
           caseFile.metaData!.gdbQueryStatus = 'ERROR';
           caseFile.metaData!.gdbErrorMessage = err.message || 'Unknown error during GDB tool execution';
         }
       } else {
-        console.log('Skipping GDB query as property is not in MA.');
+        console.log(`[${caseFile.reportId}] Skipping GDB query as property is not in MA.`);
         caseFile.metaData!.gdbQueryStatus = 'SKIPPED'; // New status if needed in schema
       }
 
       // 1. Data Extraction - Phase 2: Web-based Extraction (if needed)
       if (!gdbSucceeded || (caseFile.metaData?.gdbQueryStatus !== 'SUCCESS')) { // If GDB failed or low confidence, run web extraction.
-        console.log('Proceeding with web-based data extraction.');
+        console.log(`[${caseFile.reportId}] Proceeding with web-based data extraction.`);
         const extractionInput: z.infer<typeof DataExtractionInputSchema> = {
           address: caseFile.propertyAddress,
           city: caseFile.city,
@@ -204,7 +207,22 @@ export const masterReportGenerationFlow = defineFlow(
           // Potentially add context if GDB returned partial data, to guide verification
           existingDataSummary: gdbSucceeded && caseFile.metaData?.gdbQueryStatus === 'SUCCESS' ? "GDB data found, verify and supplement." : undefined,
         };
-        const webExtractionResult = await runTool(dataExtractionTool, extractionInput) as z.infer<typeof DataExtractionOutputSchema>;
+        let webExtractionResult: z.infer<typeof DataExtractionOutputSchema> | null = null;
+        try {
+          webExtractionResult = await runTool(dataExtractionTool, extractionInput) as z.infer<typeof DataExtractionOutputSchema>;
+          // Assuming successful tool run implies some status, though specific success status is set during merge
+        } catch (error: any) {
+          console.error(`[${caseFile.reportId}] Error running dataExtractionTool:`, error);
+          if (!caseFile.statusFlags) caseFile.statusFlags = {};
+          caseFile.statusFlags.webDataExtractionTool = 'ERROR';
+          if (!caseFile.narratives) caseFile.narratives = {};
+          caseFile.narratives.webDataExtractionError = `Error during web-based data extraction: ${error.message || 'Unknown error'}`;
+          // Ensure metaData and webExtractionOverallConfidence are initialized before assignment
+          if (!caseFile.metaData) {
+            caseFile.metaData = { webExtractionDetails: [], gdbQueryStatus: caseFile.metaData?.gdbQueryStatus || 'UNKNOWN' };
+          }
+          caseFile.metaData.webExtractionOverallConfidence = 0;
+        }
         
         // Merge webExtractionResult into caseFile.propertyDetails
         // Prioritize GDB data if it was successful, otherwise fill with web data
@@ -260,38 +278,71 @@ export const masterReportGenerationFlow = defineFlow(
       currentSubFlowContext = { ...flowContext, caseFile };
 
       // 2. Site Description
-      const siteInput: z.infer<typeof SiteDescriptionInputSchema> = {
-        address: caseFile.propertyAddress,
-        city: caseFile.city,
-        county: caseFile.county,
-        propertyTypeGeneral: caseFile.propertyType,
-      };
-      const siteResult = await runFlow(siteDescriptionFlow, siteInput, { context: currentSubFlowContext });
-      caseFile = { ...caseFile, ...siteResult };
+      try {
+        const siteInput: z.infer<typeof SiteDescriptionInputSchema> = {
+          address: caseFile.propertyAddress,
+          city: caseFile.city,
+          county: caseFile.county,
+          propertyTypeGeneral: caseFile.propertyType,
+        };
+        const siteResult = await runFlow(siteDescriptionFlow, siteInput, { context: currentSubFlowContext });
+        caseFile = { ...caseFile, ...siteResult }; // siteResult might contain narratives.siteDescription
+        if (!caseFile.statusFlags) caseFile.statusFlags = {};
+        caseFile.statusFlags.siteDescriptionFlow = 'SUCCESS'; 
+      } catch (error: any) {
+        console.error(`[${caseFile.reportId}] Error in Site Description Flow:`, error);
+        if (!caseFile.statusFlags) caseFile.statusFlags = {};
+        caseFile.statusFlags.siteDescriptionFlow = 'ERROR';
+        if (!caseFile.narratives) caseFile.narratives = {};
+        caseFile.narratives.siteDescriptionError = `Error in Site Description Flow: ${error.message || 'Unknown error'}`;
+        caseFile.narratives.siteDescription = caseFile.narratives.siteDescription || "Site description could not be generated due to an error.";
+      }
       currentSubFlowContext = { ...flowContext, caseFile }; 
 
       // 3. Market Analysis
-      const marketInput: z.infer<typeof MarketAnalysisInputSchema> = {
-        city: caseFile.city,
-        county: caseFile.county,
-        propertyAddress: caseFile.propertyAddress,
-        propertyType: caseFile.propertyType,
-      };
-      const marketResult = await runFlow(marketAnalysisFlow, marketInput, { context: currentSubFlowContext });
-      caseFile = { ...caseFile, ...marketResult };
+      try {
+        const marketInput: z.infer<typeof MarketAnalysisInputSchema> = {
+          city: caseFile.city,
+          county: caseFile.county,
+          propertyAddress: caseFile.propertyAddress,
+          propertyType: caseFile.propertyType,
+        };
+        const marketResult = await runFlow(marketAnalysisFlow, marketInput, { context: currentSubFlowContext });
+        caseFile = { ...caseFile, ...marketResult }; // marketResult might contain narratives.marketAnalysis
+        if (!caseFile.statusFlags) caseFile.statusFlags = {};
+        caseFile.statusFlags.marketAnalysisFlow = 'SUCCESS';
+      } catch (error: any) {
+        console.error(`[${caseFile.reportId}] Error in Market Analysis Flow:`, error);
+        if (!caseFile.statusFlags) caseFile.statusFlags = {};
+        caseFile.statusFlags.marketAnalysisFlow = 'ERROR';
+        if (!caseFile.narratives) caseFile.narratives = {};
+        caseFile.narratives.marketAnalysisError = `Error in Market Analysis Flow: ${error.message || 'Unknown error'}`;
+        caseFile.narratives.marketAnalysis = caseFile.narratives.marketAnalysis || "Market analysis could not be generated due to an error.";
+      }
       currentSubFlowContext = { ...flowContext, caseFile }; 
 
       // 4. HBU Analysis
-      const hbuInput: z.infer<typeof HbuInputSchema> = {
-        siteDescriptionSummary: caseFile.narratives?.siteDescription || '', 
-        marketOverviewSummary: caseFile.narratives?.marketAnalysis || '', 
-        propertyAddress: caseFile.propertyAddress,
-        city: caseFile.city,
-        county: caseFile.county,
-        propertyTypeGeneral: caseFile.propertyType,
-      };
-      const hbuResult = await runFlow(hbuFlow, hbuInput, { context: currentSubFlowContext });
-      caseFile = { ...caseFile, ...hbuResult };
+      try {
+        const hbuInput: z.infer<typeof HbuInputSchema> = {
+          siteDescriptionSummary: caseFile.narratives?.siteDescription || '', 
+          marketOverviewSummary: caseFile.narratives?.marketAnalysis || '', 
+          propertyAddress: caseFile.propertyAddress,
+          city: caseFile.city,
+          county: caseFile.county,
+          propertyTypeGeneral: caseFile.propertyType,
+        };
+        const hbuResult = await runFlow(hbuFlow, hbuInput, { context: currentSubFlowContext });
+        caseFile = { ...caseFile, ...hbuResult }; // hbuResult might contain narratives.hbuAnalysis
+        if (!caseFile.statusFlags) caseFile.statusFlags = {};
+        caseFile.statusFlags.hbuAnalysisFlow = 'SUCCESS';
+      } catch (error: any) {
+        console.error(`[${caseFile.reportId}] Error in HBU Analysis Flow:`, error);
+        if (!caseFile.statusFlags) caseFile.statusFlags = {};
+        caseFile.statusFlags.hbuAnalysisFlow = 'ERROR';
+        if (!caseFile.narratives) caseFile.narratives = {};
+        caseFile.narratives.hbuAnalysisError = `Error in HBU Analysis Flow: ${error.message || 'Unknown error'}`;
+        caseFile.narratives.hbuAnalysis = caseFile.narratives.hbuAnalysis || "HBU analysis could not be generated due to an error.";
+      }
       currentSubFlowContext = { ...flowContext, caseFile }; 
 
       // 5. Comparable Sales Analysis (Refactored to take full CaseFile)
@@ -478,49 +529,96 @@ export const masterReportGenerationFlow = defineFlow(
       currentSubFlowContext.caseFile = caseFile; // Update context
 
       // 9. Reconciliation
-      const reconciliationInput: z.infer<typeof ReconciliationInputSchema> = {
-        appraisalCaseFile: caseFile, // Pass the entire, updated caseFile
-      };
-      const reconciliationResult = await runFlow(reconciliationFlow, reconciliationInput, { context: currentSubFlowContext }) as ReconciliationOutput;
-      
-      if (reconciliationResult) {
-        caseFile.finalReconciledValue = reconciliationResult.reconciledValue;
+      try {
+        const reconciliationInput: z.infer<typeof ReconciliationInputSchema> = {
+          appraisalCaseFile: caseFile, // Pass the entire, updated caseFile
+        };
+        const reconciliationResult = await runFlow(reconciliationFlow, reconciliationInput, { context: currentSubFlowContext }) as ReconciliationOutput;
+        
+        if (reconciliationResult) {
+          caseFile.finalReconciledValue = reconciliationResult.reconciledValue;
+          if (!caseFile.narratives) caseFile.narratives = {};
+          caseFile.narratives.reconciliation = reconciliationResult.narrative;
+          if (!caseFile.confidenceScoresOverall) caseFile.confidenceScoresOverall = {};
+          caseFile.confidenceScoresOverall.reconciliation = reconciliationResult.confidenceScore;
+          if (!caseFile.statusFlags) caseFile.statusFlags = {};
+          caseFile.statusFlags.reconciliationFlow = 'SUCCESS';
+          // Optionally, log or store reconciliationResult.sources if needed
+          console.log("Reconciliation Flow successful. Final Reconciled Value: ", reconciliationResult.reconciledValue);
+        } else {
+          console.warn("Reconciliation Flow did not return a result.");
+          if (!caseFile.statusFlags) caseFile.statusFlags = {};
+          caseFile.statusFlags.reconciliationFlow = 'ERROR';
+          if (!caseFile.narratives) caseFile.narratives = {};
+          caseFile.narratives.reconciliationError = "Reconciliation Flow did not return a result or encountered an issue.";
+          caseFile.narratives.reconciliation = caseFile.narratives.reconciliation || "Reconciliation could not be completed.";
+        }
+      } catch (error: any) {
+        console.error("Error in Reconciliation Flow:", error);
+        if (!caseFile.statusFlags) caseFile.statusFlags = {};
+        caseFile.statusFlags.reconciliationFlow = 'ERROR';
         if (!caseFile.narratives) caseFile.narratives = {};
-        caseFile.narratives.reconciliation = reconciliationResult.narrative;
-        if (!caseFile.confidenceScoresOverall) caseFile.confidenceScoresOverall = {};
-        caseFile.confidenceScoresOverall.reconciliation = reconciliationResult.confidenceScore;
-        caseFile.statusFlags!.reconciliationFlow = 'SUCCESS';
-        // Optionally, log or store reconciliationResult.sources if needed
-        console.log("Reconciliation Flow successful. Final Reconciled Value: ", reconciliationResult.reconciledValue);
-      } else {
-        console.warn("Reconciliation Flow did not return a result.");
-        caseFile.statusFlags!.reconciliationFlow = 'ERROR';
+        caseFile.narratives.reconciliationError = `Error in Reconciliation Flow: ${error.message || 'Unknown error'}`;
+        caseFile.narratives.reconciliation = caseFile.narratives.reconciliation || "Reconciliation could not be completed due to an error.";
       }
       currentSubFlowContext = { ...flowContext, caseFile };
 
       // 10. Executive Summary
-      const summaryInput: z.infer<typeof ExecutiveSummaryInputSchema> = {
-        // assembleExecutiveSummaryPrompt will pull from the caseFile in context
-        appraisalCaseFile: caseFile, // Provide the full caseFile
-      };
-      const summaryResult = await runFlow(executiveSummaryFlow, summaryInput, { context: currentSubFlowContext });
-      caseFile = { ...caseFile, ...summaryResult };
+      try {
+        const summaryInput: z.infer<typeof ExecutiveSummaryInputSchema> = {
+          // assembleExecutiveSummaryPrompt will pull from the caseFile in context
+          appraisalCaseFile: caseFile, // Provide the full caseFile
+        };
+        const summaryResult = await runFlow(executiveSummaryFlow, summaryInput, { context: currentSubFlowContext });
+        caseFile = { ...caseFile, ...summaryResult }; // summaryResult might contain narratives.executiveSummary
+        if (!caseFile.statusFlags) caseFile.statusFlags = {};
+        caseFile.statusFlags.executiveSummaryFlow = 'SUCCESS';
+      } catch (error: any) {
+        console.error("Error in Executive Summary Flow:", error);
+        if (!caseFile.statusFlags) caseFile.statusFlags = {};
+        caseFile.statusFlags.executiveSummaryFlow = 'ERROR';
+        if (!caseFile.narratives) caseFile.narratives = {};
+        caseFile.narratives.executiveSummaryError = `Error in Executive Summary Flow: ${error.message || 'Unknown error'}`;
+        caseFile.narratives.executiveSummary = caseFile.narratives.executiveSummary || "Executive summary could not be generated due to an error.";
+      }
       currentSubFlowContext = { ...flowContext, caseFile };
 
       // 11. Cover Letter
-      const coverInput: z.infer<typeof CoverLetterInputSchema> = {
-         appraisalCaseFile: caseFile, // Provide the full caseFile
-      };
-      const coverResult = await runFlow(coverLetterFlow, coverInput, { context: currentSubFlowContext });
-      caseFile = { ...caseFile, ...coverResult };
+      try {
+        const coverInput: z.infer<typeof CoverLetterInputSchema> = {
+           appraisalCaseFile: caseFile, // Provide the full caseFile
+        };
+        const coverResult = await runFlow(coverLetterFlow, coverInput, { context: currentSubFlowContext });
+        caseFile = { ...caseFile, ...coverResult }; // coverResult might contain narratives.coverLetter
+        if (!caseFile.statusFlags) caseFile.statusFlags = {};
+        caseFile.statusFlags.coverLetterFlow = 'SUCCESS';
+      } catch (error: any) {
+        console.error("Error in Cover Letter Flow:", error);
+        if (!caseFile.statusFlags) caseFile.statusFlags = {};
+        caseFile.statusFlags.coverLetterFlow = 'ERROR';
+        if (!caseFile.narratives) caseFile.narratives = {};
+        caseFile.narratives.coverLetterError = `Error in Cover Letter Flow: ${error.message || 'Unknown error'}`;
+        caseFile.narratives.coverLetter = caseFile.narratives.coverLetter || "Cover letter could not be generated due to an error.";
+      }
       currentSubFlowContext = { ...flowContext, caseFile };
 
       // 12. Certification
-      const certInput: z.infer<typeof CertificationInputSchema> = {
-         appraisalCaseFile: caseFile, // Provide the full caseFile
-      };
-      const certResult = await runFlow(certificationFlow, certInput, { context: currentSubFlowContext });
-      caseFile = { ...caseFile, ...certResult };
+      try {
+        const certInput: z.infer<typeof CertificationInputSchema> = {
+           appraisalCaseFile: caseFile, // Provide the full caseFile
+        };
+        const certResult = await runFlow(certificationFlow, certInput, { context: currentSubFlowContext });
+        caseFile = { ...caseFile, ...certResult }; // certResult might contain narratives.certification
+        if (!caseFile.statusFlags) caseFile.statusFlags = {};
+        caseFile.statusFlags.certificationFlow = 'SUCCESS';
+      } catch (error: any) {
+        console.error("Error in Certification Flow:", error);
+        if (!caseFile.statusFlags) caseFile.statusFlags = {};
+        caseFile.statusFlags.certificationFlow = 'ERROR';
+        if (!caseFile.narratives) caseFile.narratives = {};
+        caseFile.narratives.certificationError = `Error in Certification Flow: ${error.message || 'Unknown error'}`;
+        caseFile.narratives.certification = caseFile.narratives.certification || "Certification statement could not be generated due to an error.";
+      }
       currentSubFlowContext = { ...flowContext, caseFile };
 
       // 13. Compliance Check
