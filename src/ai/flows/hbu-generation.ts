@@ -120,12 +120,6 @@ For each test, reference specific data from the provided site and market informa
 For each of the four tests, provide a detailed rationale, referencing the provided data or your specific web search findings (including the query and source). If you cannot find a specific data point after diligent search, state so, assign a low confidence score for that aspect, and proceed with a reasoned assumption based on typical patterns for Eastern Massachusetts, clearly identifying it as an assumption.
 
 **Output Format (JSON):**
--   `hbuAsVacant`: Your conclusion for HBU as vacant, with rationale.
--   `hbuAsImproved`: Your conclusion for HBU as improved, with rationale.
--   `detailedAnalysis`: An object with keys: `legallyPermissible`, `physicallyPossible`, `financiallyFeasible`, `maximallyProductive`. Each value should be a string containing your detailed reasoning for that test, referencing specific data points from site/market summaries or your own targeted search findings (including specific queries and cited sources like "${city} Zoning Bylaw Section X.Y").
--   `narrativeSummary`: After populating all other fields, synthesize a comprehensive narrative summary of your HBU analysis. This should flow logically, covering the four tests, the conclusions for HBU as vacant and as improved, and the overall reasoning. This narrative is for the main appraisal report.
--   `confidenceScore`: Your overall confidence (0.0-1.0) in the HBU conclusion, based on the reliability and completeness of the data for all four tests.
-
 Be explicit, cite your sources or search queries, and do not skip any step.
 `;
 }

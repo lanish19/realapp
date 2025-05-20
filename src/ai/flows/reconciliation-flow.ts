@@ -31,7 +31,7 @@ export const ReconciliationOutputSchema = z.object({
 });
 export type ReconciliationOutput = z.infer<typeof ReconciliationOutputSchema>;
 
-export function assembleReconciliationPrompt(input: z.infer<typeof ReconciliationInputSchema>): string {
+export async function assembleReconciliationPrompt(input: z.infer<typeof ReconciliationInputSchema>): Promise<string> {
   const { appraisalCaseFile, salesComparisonApproach, incomeApproach, costApproach } = input;
   const { propertyDetails, marketAnalysis, highestAndBestUse, userReconciliationInputs } = appraisalCaseFile;
 
