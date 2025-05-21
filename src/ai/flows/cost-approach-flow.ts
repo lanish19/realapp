@@ -189,7 +189,6 @@ export const costApproachFlow = ai.defineFlow(
 
     const costGeneration = await ai.generate({
       prompt,
-      model: 'gemini-pro',
       output: { schema: CostApproachOutputSchema },
       tools: [googleSearch], 
       toolChoice: 'auto',

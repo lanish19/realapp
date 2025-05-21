@@ -208,7 +208,6 @@ export const salesComparisonApproachFlow = ai.defineFlow(
 
     const scaGeneration = await ai.generate({
       prompt,
-      model: 'gemini-pro',
       output: { schema: SalesComparisonApproachOutputSchema },
       tools: [googleSearch],
       toolChoice: 'auto',

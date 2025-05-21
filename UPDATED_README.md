@@ -46,7 +46,7 @@ GOOGLE_API_KEY="YOUR_GOOGLE_AI_STUDIO_API_KEY"
 # Optional: Absolute path to your local MassGIS L3 Parcels geodatabase file.
 # Only needed if you intend to use the local GDB extraction feature for properties in Massachusetts.
 # Example: /Users/yourname/data/MassGIS_L3_Parcels.gdb
-# Example: C:\\Users\\yourname\\data\\MassGIS_L3_Parcels.gdb
+# Example: C:\Users\yourname\data\MassGIS_L3_Parcels.gdb
 GDB_PATH=""
 ```
 
