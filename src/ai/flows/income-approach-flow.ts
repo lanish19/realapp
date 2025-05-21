@@ -212,7 +212,6 @@ export const incomeApproachFlow = ai.defineFlow(
 
     const incomeGeneration = await ai.generate({
       prompt,
-      model: 'gemini-pro', // Assuming gemini-pro, adjust if needed
       output: { schema: IncomeApproachOutputSchema },
       tools: [googleSearch], // Uncomment if googleSearch tool is confirmed and needed
       toolChoice: 'auto',
