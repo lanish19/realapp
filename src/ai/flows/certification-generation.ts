@@ -34,7 +34,27 @@ const CertificationOutputSchema = z.object({
 export type CertificationOutput = z.infer<typeof CertificationOutputSchema>;
 
 export async function generateCertification(input: CertificationInput): Promise<CertificationOutput> {
-  return certificationFlow(input);
+  // Create a minimal AppraisalCaseFile object from the input
+  const minimalCaseFile: Partial<AppraisalCaseFile> = {
+    reportDate: input.reportDate,
+    appraiserDetails: {
+      name: input.appraiserName,
+      license: input.appraiserLicense,
+    },
+    // Attempt to parse string value like "$1,234,567" to number
+    finalReconciledValue: parseFloat(input.appraisedValue.replace(/[^\d.-]/g, '')) || 0, 
+    propertyAddress: input.propertyAddress,
+    effectiveDate: input.effectiveDateOfValue,
+    intendedUser: input.intendedUser,
+    intendedUse: input.intendedUse,
+    // Note: Other fields of AppraisalCaseFile are not present here.
+    // assembleCertificationPrompt only uses the fields defined above.
+  };
+
+  // Call certificationFlow with the minimalCaseFile in the context
+  // The 'as AppraisalCaseFile' assertion is used because certificationFlow's context expects a full AppraisalCaseFile,
+  // but assembleCertificationPrompt (the actual consumer via context) is designed to handle these minimal fields.
+  return certificationFlow(input, { caseFile: minimalCaseFile as AppraisalCaseFile });
 }
 
 export async function generateCertificationWithCaseFile(caseFile: AppraisalCaseFile): Promise<Partial<AppraisalCaseFile>> {

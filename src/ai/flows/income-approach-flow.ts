@@ -208,16 +208,25 @@ export const incomeApproachFlow = ai.defineFlow(
       };
     }
     
-    const prompt = assembleIncomeApproachPrompt(caseFile, input.incomeApproachUserInputs);
+    const promptText = assembleIncomeApproachPrompt(caseFile, input.incomeApproachUserInputs);
 
-    const incomeGeneration = await ai.generate({
-      prompt,
+    // Define the prompt object for consistency
+    const incomeApproachAnalysisPrompt = ai.definePrompt({
+      name: 'incomeApproachAnalysisPrompt',
+      inputSchema: IncomeApproachInputSchema, // The input to the flow is suitable here
       output: { schema: IncomeApproachOutputSchema },
-      tools: [googleSearch], // Uncomment if googleSearch tool is confirmed and needed
+      prompt: '', // Dynamic prompt text will be supplied in runPrompt
+      tools: [googleSearch],
       toolChoice: 'auto',
     });
 
-    const output = incomeGeneration.output();
+    const { output } = await ai.runPrompt({
+      prompt: incomeApproachAnalysisPrompt, // Pass the defined prompt object
+      input: input, // Pass the original flow input
+      promptText: promptText, // Supply the dynamically generated prompt text
+    });
+
+    // const output = incomeGeneration.output(); // output is directly from runPrompt
 
     if (!output) {
       throw new Error("AI failed to generate Income Approach output or output was empty.");

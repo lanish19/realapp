@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { defineFlow } from 'ai-genkit';
 import { ai } from '@/ai/genkit'; // Assuming genkit instance is exported as 'ai'
-import { AppraisalCaseFile, AppraisalCaseFileSchema } from '@/lib/appraisal-case-file'; // Corrected path
+import { AppraisalCaseFile, AppraisalCaseFileSchema } from '@/lib/appraisal-case-file';
 
 // Input schema: AppraisalCaseFile or full report text
 export const ComplianceCheckInputSchema = z.object({
@@ -75,13 +75,18 @@ export const complianceCheckFlow = defineFlow({
     tools: any; // Replace with specific Genkit tools type if available
     context: any; // Replace with specific Genkit context type if available
   }) {
-    try {
-      const prompt = assembleComplianceCheckPrompt(input);
+    // Define the prompt object
+    const complianceCheckAnalysisPrompt = ai.definePrompt({
+      name: 'complianceCheckAnalysisPrompt',
+      inputSchema: ComplianceCheckInputSchema, // Use existing input schema
+      output: { schema: ComplianceCheckOutputSchema },
+      prompt: (inputData: ComplianceCheckInput) => assembleComplianceCheckPrompt(inputData),
+    });
 
-      const { output } = await ai.runPrompt({
-        name: 'complianceCheckAnalysisPrompt',
-        output: { schema: ComplianceCheckOutputSchema },
-        prompt,
+    try {
+      const { output } = await ai.runPrompt({ 
+        prompt: complianceCheckAnalysisPrompt, 
+        input 
       });
 
       if (!output) {

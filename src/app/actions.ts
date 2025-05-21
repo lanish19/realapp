@@ -15,7 +15,7 @@ import { costApproachFlow } from '@/ai/flows/cost-approach-flow';
 import { reconciliationFlow } from '@/ai/flows/reconciliation-flow';
 import { generateExecutiveSummaryWithCaseFile } from '@/ai/flows/executive-summary-generation';
 import { generateCoverLetterWithCaseFile } from '@/ai/flows/cover-letter-generation';
-import { complianceCheckFlow } from '@/ai/flows/compliance-check-flow';
+import { complianceCheckFlow, type ComplianceCheckOutput } from '@/ai/flows/compliance-check-flow';
 
 const formSchema = z.object({
   propertyAddress: z.string().min(5, "Property address must be at least 5 characters."),
@@ -122,29 +122,13 @@ async function getBasePropertyContext(address: string, city: string, county: str
 }
 
 
-export async function generateFullReportAction(data: ValuGenFormInput): Promise<ReportSectionsOutput> {
+export async function generateFullReportAction(data: ValuGenFormInput): Promise<AppraisalCaseFile | { error: string }> {
   try {
     // Use the orchestrator flow for full report generation
     const caseFile = await masterReportGenerationFlow(data);
 
     // For now, return the main report sections from the case file
-    return {
-      coverLetter: caseFile.narratives?.coverLetter,
-      executiveSummary: caseFile.narratives?.executiveSummary,
-      siteDescription: caseFile.narratives?.siteDescription,
-      marketAnalysis: caseFile.narratives?.marketAnalysis,
-      hbuAnalysis: caseFile.narratives?.hbuAnalysis,
-      certification: caseFile.narratives?.certification,
-      salesComparisonApproach: caseFile.narratives?.salesComparisonApproach,
-      incomeApproachValuation: caseFile.narratives?.incomeApproach,
-      incomeAndExpenseStatement: caseFile.valuationResults?.income?.proForma ? JSON.stringify(caseFile.valuationResults.income.proForma, null, 2) : undefined,
-      reconcilementOfOpinion: caseFile.narratives?.reconciliation,
-      statusFlags: caseFile.statusFlags,
-      error: (caseFile as any).error,
-      // ...other sections as needed
-    };
-    // (Future) Optionally return the full case file for advanced UI/UX
-    // return caseFile;
+    return caseFile;
   } catch (e: any) {
     return { error: e.message || 'An unexpected error occurred.' };
   }
@@ -194,6 +178,20 @@ export async function regenerateReconciliationSection(caseFile: AppraisalCaseFil
   };
 }
 
+export async function regenerateComplianceCheckSection(caseFile: AppraisalCaseFile): Promise<ComplianceCheckOutput> {
+  try {
+    const result = await complianceCheckFlow({ appraisalCaseFile: caseFile });
+    return result;
+  } catch (e: any) {
+    console.error("Error in regenerateComplianceCheckSection:", e);
+    return {
+      checksPassed: [`Error: ${e.message}`],
+      potentialIssues: [{ section: "Overall Error", issue: e.message || 'An unexpected error occurred during compliance check regeneration.', recommendation: "Check server logs and retry." }],
+      overallComplianceScore: 0,
+    };
+  }
+}
+
 export async function saveSalesComparisonGrid(caseFile: AppraisalCaseFile, newGrid: any) {
   return {
     ...caseFile,
@@ -233,7 +231,7 @@ export async function saveCostApproachData(caseFile: AppraisalCaseFile, newCostD
 export async function regenerateExecutiveSummarySection(caseFile: AppraisalCaseFile) {
   const result = await generateExecutiveSummaryWithCaseFile(caseFile);
   return {
-    narrative: result.narrative || result.executiveSummary,
+    narrative: result.narratives?.executiveSummary,
     output: result,
   };
 }
@@ -241,7 +239,7 @@ export async function regenerateExecutiveSummarySection(caseFile: AppraisalCaseF
 export async function regenerateCoverLetterSection(caseFile: AppraisalCaseFile) {
   const result = await generateCoverLetterWithCaseFile(caseFile);
   return {
-    narrative: result.narrative || result.coverLetter,
+    narrative: result.narratives?.coverLetter,
     output: result,
   };
 }

@@ -7,7 +7,7 @@
 
 import { defineFlow, runFlow } from '@genkit-ai/flow';
 import { z } from 'zod';
-import { geminiPro } from '@genkit-ai/googleai';
+import { ai } from '@/ai/genkit'; // Import the global Genkit AI client
 import { AppraisalCaseFileSchema } from '../../lib/appraisal-case-file';
 import { SalesComparisonApproachOutputSchema } from './sales-comparison-approach-flow';
 import { IncomeApproachOutputSchema } from './income-approach-flow';
@@ -148,7 +148,7 @@ export const reconciliationFlow = defineFlow(
   async (input: ReconciliationInput) => {
     const prompt = assembleReconciliationPrompt(input);
 
-    const llmResponse = await geminiPro.generate({
+    const llmResponse = await ai.generate({ // Use the global 'ai' client
       prompt: prompt,
       output: {
         format: 'json',

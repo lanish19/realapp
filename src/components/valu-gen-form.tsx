@@ -8,11 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { generateFullReportAction, type ValuGenFormInput, type ReportSectionsOutput, regenerateSalesComparisonSection, regenerateIncomeApproachSection, regenerateCostApproachSection, regenerateReconciliationSection, regenerateExecutiveSummarySection, regenerateCoverLetterSection, regenerateComplianceCheckSection, saveSalesComparisonGrid, saveIncomeProForma, saveCostApproachData } from '@/app/actions';
+import { generateFullReportAction, type ValuGenFormInput, regenerateSalesComparisonSection, regenerateIncomeApproachSection, regenerateCostApproachSection, regenerateReconciliationSection, regenerateExecutiveSummarySection, regenerateCoverLetterSection, regenerateComplianceCheckSection, saveSalesComparisonGrid, saveIncomeProForma, saveCostApproachData } from '@/app/actions';
+import { type AppraisalCaseFile } from '@/lib/appraisal-case-file';
 import { 
-  Loader2, FileText, ClipboardList, MapPin, BarChartBig, AlertCircle, ScrollText, ShieldCheck, 
-  Landmark, BookOpen, CalendarDays, Users, Telescope, Clock, Award, BadgeCheck, Building, 
-  AreaChart, Home, Briefcase, FileSearch, DollarSign, TrendingUp, Scale, ChevronDown, ChevronUp 
+  Loader2, FileText, ClipboardList, MapPin, BarChartBig, AlertCircle, ScrollText, ShieldCheck,
+  Landmark, BookOpen, CalendarDays, Users, Telescope, Clock, Award, BadgeCheck, Building,
+  AreaChart, Home, Briefcase, FileSearch, DollarSign, TrendingUp, Scale, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -138,26 +139,27 @@ const ReportSectionDisplay: React.FC<ReportSectionDisplayProps> = ({ title, cont
 );
 };
 
-// Define the full report structure as per user's list
-const reportStructure: Array<{ title: string; key: keyof ReportSectionsOutput; icon: React.ReactNode }> = [
+// Define the full report structure, ensuring keys match AppraisalCaseFile['narratives'] or are handled if elsewhere
+const reportStructure: Array<{ title: string; key: string; icon: React.ReactNode }> = [
   { title: "EXECUTIVE SUMMARY", key: "executiveSummary", icon: <ClipboardList className="h-5 w-5" /> },
-  { title: "REPORTING OPTION", key: "reportingOption", icon: <FileSearch className="h-5 w-5" /> },
+  // Assuming these are placeholders or will be mapped to specific narrative fields if they exist
+  { title: "REPORTING OPTION", key: "reportingOption", icon: <FileSearch className="h-5 w-5" /> }, 
   { title: "CERTIFICATION", key: "certification", icon: <ShieldCheck className="h-5 w-5" /> },
   { title: "CONTINGENT & LIMITING CONDITIONS", key: "certification", icon: <ScrollText className="h-5 w-5" /> }, // Uses certification content
   { title: "DEFINITION OF MARKET VALUE", key: "definitionOfMarketValue", icon: <BookOpen className="h-5 w-5" /> },
   { title: "FEE SIMPLE ESTATE", key: "feeSimpleEstate", icon: <Landmark className="h-5 w-5" /> },
   { title: "PURPOSE OF THE APPRAISAL", key: "purposeOfTheAppraisal", icon: <Telescope className="h-5 w-5" /> },
-  { title: "APPRAISAL DATE", key: "appraisalDate", icon: <CalendarDays className="h-5 w-5" /> },
-  { title: "INTENDED USE OF REPORT", key: "intendedUseOfReport", icon: <Users className="h-5 w-5" /> },
-  { title: "INTENDED USER OF REPORT", key: "intendedUserOfReport", icon: <Users className="h-5 w-5" /> },
+  { title: "APPRAISAL DATE", key: "appraisalDate", icon: <CalendarDays className="h-5 w-5" /> }, // Placeholder
+  { title: "INTENDED USE OF REPORT", key: "intendedUseOfReport", icon: <Users className="h-5 w-5" /> }, // User input
+  { title: "INTENDED USER OF REPORT", key: "intendedUserOfReport", icon: <Users className="h-5 w-5" /> }, // User input
   { title: "SCOPE OF ASSIGNMENT", key: "scopeOfAssignment", icon: <Briefcase className="h-5 w-5" /> },
   { title: "EXPOSURE TIME", key: "exposureTime", icon: <Clock className="h-5 w-5" /> },
   { title: "MARKETING TIME", key: "marketingTime", icon: <Clock className="h-5 w-5" /> },
   { title: "COMPETENCY PROVISION", key: "competencyProvision", icon: <Award className="h-5 w-5" /> },
   { title: "LICENSE PROVISION", key: "licenseProvision", icon: <BadgeCheck className="h-5 w-5" /> },
   { title: "PROPERTY IDENTIFICATION", key: "propertyIdentification", icon: <MapPin className="h-5 w-5" /> }, 
-  { title: "AREA AND NEIGHBORHOOD DESCRIPTION", key: "areaAndNeighborhoodDescription", icon: <AreaChart className="h-5 w-5" /> }, 
-  { title: "NEIGHBORHOOD DESCRIPTION", key: "neighborhoodDescription", icon: <Home className="h-5 w-5" /> }, 
+  { title: "AREA AND NEIGHBORHOOD DESCRIPTION", key: "marketAnalysis", icon: <AreaChart className="h-5 w-5" /> }, // map to marketAnalysis
+  { title: "NEIGHBORHOOD DESCRIPTION", key: "marketAnalysis", icon: <Home className="h-5 w-5" /> },  // map to marketAnalysis
   { title: "SITE DESCRIPTION", key: "siteDescription", icon: <MapPin className="h-5 w-5" /> },
   { title: "IMPROVEMENT DESCRIPTION", key: "improvementDescription", icon: <Building className="h-5 w-5" /> }, 
   { title: "OWNERSHIP, SALES HISTORY, & LEGAL DESCRIPTION OF PROPERTY", key: "ownershipSalesHistoryLegalDescription", icon: <FileText className="h-5 w-5" /> },
@@ -166,9 +168,9 @@ const reportStructure: Array<{ title: string; key: keyof ReportSectionsOutput; i
   { title: "HIGHEST AND BEST USE", key: "hbuAnalysis", icon: <TrendingUp className="h-5 w-5" /> },
   { title: "VALUATION METHODOLOGY & ANALYSIS", key: "valuationMethodologyAnalysis", icon: <Scale className="h-5 w-5" /> },
   { title: "SALES COMPARISON APPROACH", key: "salesComparisonApproach", icon: <DollarSign className="h-5 w-5" /> },
-  { title: "INCOME APPROACH VALUATION", key: "incomeApproachValuation", icon: <DollarSign className="h-5 w-5" /> },
-  { title: "INCOME AND EXPENSE STATEMENT", key: "incomeAndExpenseStatement", icon: <FileText className="h-5 w-5" /> },
-  { title: "RECONCILEMENT OF OPINION", key: "reconcilementOfOpinion", icon: <Scale className="h-5 w-5" /> },
+  { title: "INCOME APPROACH VALUATION", key: "incomeApproach", icon: <DollarSign className="h-5 w-5" /> }, // Corrected key
+  { title: "INCOME AND EXPENSE STATEMENT", key: "incomeAndExpenseStatement", icon: <FileText className="h-5 w-5" /> }, // Special handling
+  { title: "RECONCILEMENT OF OPINION", key: "reconciliation", icon: <Scale className="h-5 w-5" /> }, // Corrected key
 ];
 
 // Placeholder async function to simulate regeneration
@@ -177,20 +179,21 @@ async function regenerateSection(section: string) {
 }
 
 // Helper to check if all required sections are approved and compliance passes
-function canExportReport(generatedReport: any) {
-  const requiredSections = [
+function canExportReport(generatedReport: AppraisalCaseFile | null) {
+  if (!generatedReport) return false;
+  const requiredSections: (keyof AppraisalCaseFile['statusFlags'])[] = [
     'salesComparisonApproach',
-    'incomeApproachValuation',
-    'reconcilementOfOpinion',
+    'incomeApproach', // Corrected key
+    'reconciliation', // Corrected key
     'executiveSummary',
     'coverLetter',
     'costApproach',
   ];
-  const flags = generatedReport?.statusFlags || {};
+  const flags = generatedReport.statusFlags || {};
   const allApproved = requiredSections.every(
     (key) => flags[key] === 'approved'
   );
-  const compliance = generatedReport?.complianceReport;
+  const compliance = generatedReport.complianceCheckOutput; // Corrected field
   const compliancePass = compliance && (!compliance.potentialIssues || compliance.potentialIssues.length === 0);
   return allApproved && compliancePass;
 }
@@ -198,10 +201,10 @@ function canExportReport(generatedReport: any) {
 export default function ValuGenForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [generatedReport, setGeneratedReport] = useState<ReportSectionsOutput | null>(null);
+  const [generatedReport, setGeneratedReport] = useState<AppraisalCaseFile | null>(null);
   const [showValuationDetails, setShowValuationDetails] = useState(false);
   const [regenLoading, setRegenLoading] = useState<string | null>(null);
-  const [lastCaseFile, setLastCaseFile] = useState<any>(null); // Store the last generated case file for regeneration
+  const [lastCaseFile, setLastCaseFile] = useState<AppraisalCaseFile | null>(null);
   const [editState, setEditState] = useState<{ [key: string]: boolean }>({});
   const [editValue, setEditValue] = useState<{ [key: string]: string }>({});
   const [editError, setEditError] = useState<{ [key: string]: string | null }>({});
@@ -231,29 +234,38 @@ export default function ValuGenForm() {
     setIsLoading(true);
     setError(null);
     setGeneratedReport(null);
+    setLastCaseFile(null); // Also reset lastCaseFile
     try {
       const result = await generateFullReportAction(data);
-      if (result.error) {
+      if ('error' in result && result.error) {
         setError(result.error);
-      } else {
+        setGeneratedReport(null); // Ensure report is null on error
+      } else if (!('error' in result)) { // It's an AppraisalCaseFile
         setGeneratedReport(result);
-        setLastCaseFile(result.fullCaseFile || result); // Store the full case file if available, fallback to result
+        setLastCaseFile(result); 
+      } else {
+        // Should not happen if the action always returns AppraisalCaseFile or {error: string}
+        setError("An unexpected response format was received.");
+        setGeneratedReport(null);
       }
     } catch (e: any) {
       setError(e.message || "An unexpected error occurred while submitting the form.");
+      setGeneratedReport(null); // Ensure report is null on catch
     }
     setIsLoading(false);
   };
 
   // Helper to parse pro forma JSON if present
   const parsedProForma = useMemo(() => {
-    if (!generatedReport?.incomeAndExpenseStatement) return null;
+    if (!generatedReport?.valuationResults?.income?.proForma) return null;
     try {
-      return JSON.parse(generatedReport.incomeAndExpenseStatement);
+      // Assuming proForma is an object. If it's already a string, this might not be necessary.
+      return generatedReport.valuationResults.income.proForma;
     } catch {
-      return generatedReport.incomeAndExpenseStatement;
+      // Should not happen if proForma is accessed correctly
+      return null;
     }
-  }, [generatedReport?.incomeAndExpenseStatement]);
+  }, [generatedReport?.valuationResults?.income?.proForma]);
 
   return (
     <div className="space-y-8">
@@ -518,8 +530,8 @@ export default function ValuGenForm() {
                 <div className="flex-1 mb-4 md:mb-0">
                   <div className="font-semibold mb-2">Major Sections</div>
                   <ul className="space-y-1">
-                    {['salesComparisonApproach','incomeApproachValuation','reconcilementOfOpinion','executiveSummary','coverLetter','costApproach'].map((key) => {
-                      const status = generatedReport.statusFlags?.[key];
+                    {['salesComparisonApproach','incomeApproach','reconciliation','executiveSummary','coverLetter','costApproach'].map((key) => {
+                      const status = generatedReport.statusFlags?.[key as keyof AppraisalCaseFile['statusFlags']];
                       let icon, color, label;
                       if (status === 'approved') {
                         icon = <ShieldCheck className="inline h-4 w-4 text-green-600 mr-1" />;
@@ -537,14 +549,14 @@ export default function ValuGenForm() {
                       // Human-readable section name
                       const sectionName = {
                         salesComparisonApproach: 'Sales Comparison',
-                        incomeApproachValuation: 'Income Approach',
-                        reconcilementOfOpinion: 'Reconciliation',
+                        incomeApproach: 'Income Approach', // Corrected key
+                        reconciliation: 'Reconciliation', // Corrected key
                         executiveSummary: 'Executive Summary',
                         coverLetter: 'Cover Letter',
                         costApproach: 'Cost Approach',
-                      }[key];
+                      }[key as string] || key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()); // Fallback for other keys
                       return (
-                        <li key={key} className={`flex items-center gap-2 ${color}`}>
+                        <li key={key as string} className={`flex items-center gap-2 ${color}`}>
                           {icon}
                           <span className="font-medium">{sectionName}</span>
                           <span className="ml-2 text-xs">{label}</span>
@@ -556,14 +568,14 @@ export default function ValuGenForm() {
                 {/* Compliance Status */}
                 <div className="flex-1">
                   <div className="font-semibold mb-2">Compliance</div>
-                  {generatedReport.complianceReport?.potentialIssues?.length > 0 ? (
+                  {generatedReport.complianceCheckOutput?.potentialIssues && generatedReport.complianceCheckOutput.potentialIssues.length > 0 ? (
                     <div className="bg-yellow-100 border-l-4 border-yellow-500 p-3 rounded mb-2">
                       <div className="flex items-center text-yellow-800 mb-1">
                         <AlertCircle className="h-4 w-4 mr-1" />
                         <span className="font-medium">Compliance Issues Detected</span>
                       </div>
                       <ul className="list-disc ml-6 text-yellow-900 text-xs">
-                        {generatedReport.complianceReport.potentialIssues.map((issue: any, i: number) => (
+                        {generatedReport.complianceCheckOutput.potentialIssues.map((issue: any, i: number) => (
                           <li key={i}><b>{issue.section}:</b> {issue.issue} <i>({issue.recommendation})</i></li>
                         ))}
                       </ul>
@@ -574,8 +586,8 @@ export default function ValuGenForm() {
                       <span className="font-medium">All compliance checks passed!</span>
                     </div>
                   )}
-                  {typeof generatedReport.complianceReport?.overallComplianceScore === 'number' && (
-                    <div className="mt-2 text-xs text-gray-700">Overall Compliance Score: <b>{generatedReport.complianceReport.overallComplianceScore}</b></div>
+                  {typeof generatedReport.complianceCheckOutput?.overallComplianceScore === 'number' && (
+                    <div className="mt-2 text-xs text-gray-700">Overall Compliance Score: <b>{generatedReport.complianceCheckOutput.overallComplianceScore}</b></div>
                   )}
                 </div>
               </div>
@@ -592,38 +604,48 @@ export default function ValuGenForm() {
 
           <h2 className="text-2xl font-semibold text-primary text-center mb-6">Generated Report Sections Overview</h2>
           
-          {generatedReport.coverLetter && (
+          {generatedReport.narratives?.coverLetter && (
              <ReportSectionDisplay
                 title="COVER LETTER (TRANSMITTAL)"
-                content={generatedReport.coverLetter}
+                content={generatedReport.narratives.coverLetter}
                 icon={<FileText className="h-5 w-5" />}
               />
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {reportStructure.map((section) => (
-              <ReportSectionDisplay
-                key={section.title}
-                title={section.title}
-                content={generatedReport[section.key]}
-                icon={section.icon}
-                lowConfidence={generatedReport.statusFlags && generatedReport.statusFlags[section.key] === 'lowConfidence'}
-                editable={generatedReport.statusFlags && generatedReport.statusFlags[section.key] === 'lowConfidence'}
-                onApprove={() => {
-                  // Optionally update local UI state to remove lowConfidence for this section
-                  setGeneratedReport(prev => {
-                    if (!prev) return prev;
-                    const newFlags = { ...prev.statusFlags, [section.key]: 'approved' };
+            {reportStructure.map((section) => {
+              const sectionKey = section.key as keyof AppraisalCaseFile['narratives'];
+              const content = generatedReport.narratives?.[sectionKey];
+              // Handle incomeAndExpenseStatement specifically
+              const displayContent = section.key === 'incomeAndExpenseStatement' 
+                ? generatedReport.valuationResults?.income?.proForma 
+                  ? JSON.stringify(generatedReport.valuationResults.income.proForma, null, 2) 
+                  : undefined
+                : content;
+
+              return (
+                <ReportSectionDisplay
+                  key={section.title}
+                  title={section.title}
+                  content={displayContent}
+                  icon={section.icon}
+                  lowConfidence={generatedReport.statusFlags && generatedReport.statusFlags[sectionKey] === 'lowConfidence'}
+                  editable={generatedReport.statusFlags && generatedReport.statusFlags[sectionKey] === 'lowConfidence'}
+                  onApprove={() => {
+                    setGeneratedReport(prev => {
+                      if (!prev) return prev;
+                    const newFlags = { ...prev.statusFlags, [sectionKey as keyof AppraisalCaseFile['statusFlags']]: 'approved' };
                     return { ...prev, statusFlags: newFlags };
-                  });
-                }}
-              />
-            ))}
+                    });
+                  }}
+                />
+              );
+            })}
              {/* Explicitly display Market Analysis if not covered by specific items in reportStructure for clarity */}
-            {generatedReport.marketAnalysis && !reportStructure.find(s => s.key === 'marketAnalysis') && (
+          {generatedReport.narratives?.marketAnalysis && !reportStructure.find(s => s.key === 'marketAnalysis' as any) && (
               <ReportSectionDisplay
                 title="MARKET ANALYSIS (OVERVIEW)"
-                content={generatedReport.marketAnalysis}
+                content={generatedReport.narratives.marketAnalysis}
                 icon={<BarChartBig className="h-5 w-5" />}
               />
             )}
@@ -643,9 +665,9 @@ export default function ValuGenForm() {
                 {/* Sales Comparison Approach */}
                 <div>
                   <h3 className="text-lg font-semibold mb-2 flex items-center"><DollarSign className="h-5 w-5 mr-2" />Sales Comparison Approach</h3>
-                  {generatedReport.salesComparisonApproach ? (
+                  {generatedReport.narratives?.salesComparisonApproach ? (
                     <>
-                      <p className="mb-2 text-sm text-foreground whitespace-pre-wrap">{generatedReport.salesComparisonApproach}</p>
+                      <p className="mb-2 text-sm text-foreground whitespace-pre-wrap">{generatedReport.narratives.salesComparisonApproach}</p>
                       {generatedReport.valuationResults?.salesComparison?.adjustmentGrid && (
                         <div className="mb-2">
                           <span className="font-medium">Adjustment Grid:</span>
@@ -660,20 +682,41 @@ export default function ValuGenForm() {
                               <div className="flex gap-2 mt-2">
                                 <Button size="sm" onClick={() => setEditState(s => ({ ...s, salesComparisonGrid: false }))}>Cancel</Button>
                                 <Button size="sm" onClick={async () => {
+                                  const salesComparisonGridString = editValue['salesComparisonGrid'];
+                                  let parsed = null;
+
+                                  if (salesComparisonGridString && salesComparisonGridString.trim() !== '') {
+                                    try {
+                                      parsed = JSON.parse(salesComparisonGridString);
+                                      setEditError(e => ({ ...e, salesComparisonGrid: null })); // Clear previous error
+                                    } catch (err) {
+                                      setEditError(e => ({ ...e, salesComparisonGrid: 'Invalid JSON format.' }));
+                                      return; // Prevent further execution
+                                    }
+                                  } else {
+                                    setEditError(e => ({ ...e, salesComparisonGrid: 'Sales comparison grid data cannot be empty.' }));
+                                    return; // Prevent further execution
+                                  }
+
+                                  // Subsequent code only runs if parsed is not null and no error occurred
+                                  if (parsed === null) { // Should be caught by previous checks, but as a safeguard
+                                      setEditError(e => ({ ...e, salesComparisonGrid: 'An unexpected error occurred with parsing.' }));
+                                      return;
+                                  }
+
                                   try {
-                                    const parsed = JSON.parse(editValue['salesComparisonGrid'] ?? '');
-                                    const updatedCaseFile = await saveSalesComparisonGrid(lastCaseFile, parsed);
+                                    const updatedCaseFile = await saveSalesComparisonGrid(lastCaseFile!, parsed); 
                                     setLastCaseFile(updatedCaseFile);
-                                    setGeneratedReport(prev => prev ? {
+                                    setGeneratedReport(prev => prev ? ({
                                       ...prev,
                                       valuationResults: {
-                                        ...prev.valuationResults,
+                                        ...(prev.valuationResults || {}),
                                         salesComparison: {
-                                          ...prev.valuationResults?.salesComparison,
+                                          ...(prev.valuationResults?.salesComparison || {}),
                                           adjustmentGrid: parsed,
                                         },
                                       },
-                                    } : prev);
+                                    }) : prev);
                                     setEditState(s => ({ ...s, salesComparisonGrid: false }));
                                     setEditError(e => ({ ...e, salesComparisonGrid: null }));
                                     // Auto-regenerate reconciliation
@@ -683,11 +726,11 @@ export default function ValuGenForm() {
                                         userRationale: values.userRationale || '',
                                         finalUserValue: Number(values.finalUserValue) || 0,
                                       });
-                                      setGeneratedReport(prev => prev ? {
+                                      setGeneratedReport(prev => prev ? ({
                                         ...prev,
-                                        reconcilementOfOpinion: regen.narrative,
+                                        narratives: { ...(prev.narratives || {}), reconciliation: regen.narrative },
                                         valuationResults: { ...(prev.valuationResults || {}), reconciliation: regen.output },
-                                      } : prev);
+                                      }) : prev);
                                       toast ? toast.success('Reconciliation updated after Sales Comparison edit!') : alert('Reconciliation updated after Sales Comparison edit!');
                                     } catch (e) {
                                       toast ? toast.error('Failed to update Reconciliation after Sales Comparison edit.') : alert('Failed to update Reconciliation after Sales Comparison edit.');
@@ -695,30 +738,30 @@ export default function ValuGenForm() {
                                     // After reconciliation regeneration, update Executive Summary and Cover Letter
                                     try {
                                       const exec = await regenerateExecutiveSummarySection(updatedCaseFile);
-                                      setGeneratedReport(prev => prev ? {
+                                      setGeneratedReport(prev => prev ? ({
                                         ...prev,
-                                        executiveSummary: exec.narrative,
-                                      } : prev);
+                                        narratives: { ...(prev.narratives || {}), executiveSummary: exec.narrative },
+                                      }) : prev);
                                       toast ? toast.success('Executive Summary updated!') : alert('Executive Summary updated!');
                                     } catch (e) {
                                       toast ? toast.error('Failed to update Executive Summary.') : alert('Failed to update Executive Summary.');
                                     }
                                     try {
                                       const cover = await regenerateCoverLetterSection(updatedCaseFile);
-                                      setGeneratedReport(prev => prev ? {
+                                      setGeneratedReport(prev => prev ? ({
                                         ...prev,
-                                        coverLetter: cover.narrative,
-                                      } : prev);
+                                        narratives: { ...(prev.narratives || {}), coverLetter: cover.narrative },
+                                      }) : prev);
                                       toast ? toast.success('Cover Letter updated!') : alert('Cover Letter updated!');
                                     } catch (e) {
                                       toast ? toast.error('Failed to update Cover Letter.') : alert('Failed to update Cover Letter.');
                                     }
                                     try {
                                       const compliance = await regenerateComplianceCheckSection(updatedCaseFile);
-                                      setGeneratedReport(prev => prev ? {
+                                      setGeneratedReport(prev => prev ? ({
                                         ...prev,
-                                        complianceReport: compliance,
-                                      } : prev);
+                                        complianceCheckOutput: compliance,
+                                      }) : prev);
                                       toast ? toast.success('Compliance Check updated!') : alert('Compliance Check updated!');
                                     } catch (e) {
                                       toast ? toast.error('Failed to update Compliance Check.') : alert('Failed to update Compliance Check.');
@@ -746,12 +789,12 @@ export default function ValuGenForm() {
                       <Button size="sm" className="mt-2" onClick={async () => {
                         setRegenLoading('salesComparison');
                         try {
-                          const regen = await regenerateSalesComparisonSection(lastCaseFile);
-                          setGeneratedReport(prev => prev ? {
+                          const regen = await regenerateSalesComparisonSection(lastCaseFile!); 
+                          setGeneratedReport(prev => prev ? ({
                             ...prev,
-                            salesComparisonApproach: regen.narrative,
+                            narratives: { ...(prev.narratives || {}), salesComparisonApproach: regen.narrative },
                             valuationResults: { ...(prev.valuationResults || {}), salesComparison: regen.output },
-                          } : prev);
+                          }) : prev);
                           toast ? toast.success('Sales Comparison Approach regenerated!') : alert('Sales Comparison Approach regenerated!');
                         } catch (e) {
                           toast ? toast.error('Failed to regenerate Sales Comparison Approach.') : alert('Failed to regenerate Sales Comparison Approach.');
@@ -767,17 +810,17 @@ export default function ValuGenForm() {
                 {/* Income Approach */}
                 <div>
                   <h3 className="text-lg font-semibold mb-2 flex items-center"><DollarSign className="h-5 w-5 mr-2" />Income Approach</h3>
-                  {generatedReport.incomeApproachValuation ? (
+                  {generatedReport.narratives?.incomeApproach ? (
                     <>
-                      <p className="mb-2 text-sm text-foreground whitespace-pre-wrap">{generatedReport.incomeApproachValuation}</p>
-                      {parsedProForma && (
+                      <p className="mb-2 text-sm text-foreground whitespace-pre-wrap">{generatedReport.narratives.incomeApproach}</p>
+                      {generatedReport.valuationResults?.income?.proForma && (
                         <div className="mb-2">
                           <span className="font-medium">Pro Forma:</span>
                           {editState['incomeProForma'] ? (
                             <>
                               <textarea
                                 className="w-full min-h-[120px] border rounded-md p-2 text-xs mt-1"
-                                value={editValue['incomeProForma'] ?? (typeof parsedProForma === 'string' ? parsedProForma : JSON.stringify(parsedProForma, null, 2))}
+                                value={editValue['incomeProForma'] ?? JSON.stringify(generatedReport.valuationResults?.income?.proForma, null, 2)}
                                 onChange={e => setEditValue(v => ({ ...v, incomeProForma: e.target.value }))}
                               />
                               {editError['incomeProForma'] && <div className="text-red-600 text-xs">{editError['incomeProForma']}</div>}
@@ -786,12 +829,15 @@ export default function ValuGenForm() {
                                 <Button size="sm" onClick={async () => {
                                   try {
                                     const parsed = JSON.parse(editValue['incomeProForma'] ?? '');
-                                    const updatedCaseFile = await saveIncomeProForma(lastCaseFile, parsed);
+                                    const updatedCaseFile = await saveIncomeProForma(lastCaseFile!, parsed); 
                                     setLastCaseFile(updatedCaseFile);
-                                    setGeneratedReport(prev => prev ? {
+                                    setGeneratedReport(prev => prev ? ({
                                       ...prev,
-                                      incomeAndExpenseStatement: JSON.stringify(parsed, null, 2),
-                                    } : prev);
+                                      valuationResults: {
+                                        ...(prev.valuationResults || {}),
+                                        income: { ...(prev.valuationResults?.income || {}), proForma: parsed },
+                                      },
+                                    }) : prev);
                                     setEditState(s => ({ ...s, incomeProForma: false }));
                                     setEditError(e => ({ ...e, incomeProForma: null }));
                                     // Auto-regenerate reconciliation
@@ -801,11 +847,11 @@ export default function ValuGenForm() {
                                         userRationale: values.userRationale || '',
                                         finalUserValue: Number(values.finalUserValue) || 0,
                                       });
-                                      setGeneratedReport(prev => prev ? {
+                                      setGeneratedReport(prev => prev ? ({
                                         ...prev,
-                                        reconcilementOfOpinion: regen.narrative,
+                                        narratives: { ...(prev.narratives || {}), reconciliation: regen.narrative },
                                         valuationResults: { ...(prev.valuationResults || {}), reconciliation: regen.output },
-                                      } : prev);
+                                      }) : prev);
                                       toast ? toast.success('Reconciliation updated after Income edit!') : alert('Reconciliation updated after Income edit!');
                                     } catch (e) {
                                       toast ? toast.error('Failed to update Reconciliation after Income edit.') : alert('Failed to update Reconciliation after Income edit.');
@@ -813,30 +859,30 @@ export default function ValuGenForm() {
                                     // After reconciliation regeneration, update Executive Summary and Cover Letter
                                     try {
                                       const exec = await regenerateExecutiveSummarySection(updatedCaseFile);
-                                      setGeneratedReport(prev => prev ? {
+                                      setGeneratedReport(prev => prev ? ({
                                         ...prev,
-                                        executiveSummary: exec.narrative,
-                                      } : prev);
+                                        narratives: { ...(prev.narratives || {}), executiveSummary: exec.narrative },
+                                      }) : prev);
                                       toast ? toast.success('Executive Summary updated!') : alert('Executive Summary updated!');
                                     } catch (e) {
                                       toast ? toast.error('Failed to update Executive Summary.') : alert('Failed to update Executive Summary.');
                                     }
                                     try {
                                       const cover = await regenerateCoverLetterSection(updatedCaseFile);
-                                      setGeneratedReport(prev => prev ? {
+                                      setGeneratedReport(prev => prev ? ({
                                         ...prev,
-                                        coverLetter: cover.narrative,
-                                      } : prev);
+                                        narratives: { ...(prev.narratives || {}), coverLetter: cover.narrative },
+                                      }) : prev);
                                       toast ? toast.success('Cover Letter updated!') : alert('Cover Letter updated!');
                                     } catch (e) {
                                       toast ? toast.error('Failed to update Cover Letter.') : alert('Failed to update Cover Letter.');
                                     }
                                     try {
                                       const compliance = await regenerateComplianceCheckSection(updatedCaseFile);
-                                      setGeneratedReport(prev => prev ? {
+                                      setGeneratedReport(prev => prev ? ({
                                         ...prev,
-                                        complianceReport: compliance,
-                                      } : prev);
+                                        complianceCheckOutput: compliance,
+                                      }) : prev);
                                       toast ? toast.success('Compliance Check updated!') : alert('Compliance Check updated!');
                                     } catch (e) {
                                       toast ? toast.error('Failed to update Compliance Check.') : alert('Failed to update Compliance Check.');
@@ -849,10 +895,10 @@ export default function ValuGenForm() {
                             </>
                           ) : (
                             <>
-                              <pre className="bg-secondary/30 rounded p-2 text-xs overflow-x-auto mt-1">{typeof parsedProForma === 'string' ? parsedProForma : JSON.stringify(parsedProForma, null, 2)}</pre>
+                              <pre className="bg-secondary/30 rounded p-2 text-xs overflow-x-auto mt-1">{JSON.stringify(generatedReport.valuationResults?.income?.proForma, null, 2)}</pre>
                               <Button size="xs" className="mt-1" onClick={() => {
                                 setEditState(s => ({ ...s, incomeProForma: true }));
-                                setEditValue(v => ({ ...v, incomeProForma: typeof parsedProForma === 'string' ? parsedProForma : JSON.stringify(parsedProForma, null, 2) }));
+                                setEditValue(v => ({ ...v, incomeProForma: JSON.stringify(generatedReport.valuationResults?.income?.proForma, null, 2) }));
                               }}>Edit</Button>
                             </>
                           )}
@@ -865,18 +911,18 @@ export default function ValuGenForm() {
                         setRegenLoading('income');
                         try {
                           const values = form.getValues();
-                          const regen = await regenerateIncomeApproachSection(lastCaseFile, {
+                          const regen = await regenerateIncomeApproachSection(lastCaseFile!, { 
                             marketRentPerSF: Number(values.marketRentPerSF) || 0,
                             vacancyRate: Number(values.vacancyRate) || 0,
                             operatingExpenses: Number(values.operatingExpenses) || 0,
                             capRate: Number(values.capRate) || 0,
                             discountRate: values.discountRate !== undefined ? Number(values.discountRate) : undefined,
                           });
-                          setGeneratedReport(prev => prev ? {
+                          setGeneratedReport(prev => prev ? ({
                             ...prev,
-                            incomeApproachValuation: regen.narrative,
+                            narratives: { ...(prev.narratives || {}), incomeApproach: regen.narrative },
                             valuationResults: { ...(prev.valuationResults || {}), income: regen.output },
-                          } : prev);
+                          }) : prev);
                           toast ? toast.success('Income Approach regenerated!') : alert('Income Approach regenerated!');
                         } catch (e) {
                           toast ? toast.error('Failed to regenerate Income Approach.') : alert('Failed to regenerate Income Approach.');
@@ -892,15 +938,20 @@ export default function ValuGenForm() {
                 {/* Cost Approach */}
                 <div>
                   <h3 className="text-lg font-semibold mb-2 flex items-center"><DollarSign className="h-5 w-5 mr-2" />Cost Approach</h3>
-                  {generatedReport.valuationResults?.cost ? (
+                  {generatedReport.narratives?.costApproach ? ( // Check narrative for cost approach
                     <>
-                      <div className="mb-2"><span className="font-medium">Narrative: </span>{generatedReport.valuationResults.cost.narrative}</div>
-                      <div className="mb-2"><span className="font-medium">Indicated Value: </span>${generatedReport.valuationResults.cost.indicatedValue?.toLocaleString()}</div>
-                      <div className="mb-2"><span className="font-medium">Land Value: </span>${generatedReport.valuationResults.cost.landValue?.toLocaleString()}</div>
-                      <div className="mb-2"><span className="font-medium">Cost New: </span>${generatedReport.valuationResults.cost.costNew?.toLocaleString()}</div>
-                      <div className="mb-2"><span className="font-medium">Total Depreciation: </span>${generatedReport.valuationResults.cost.totalDepreciation?.toLocaleString()}</div>
+                      <p className="mb-2 text-sm text-foreground whitespace-pre-wrap">{generatedReport.narratives.costApproach}</p>
+                      {/* Display cost details if available */}
+                      {generatedReport.valuationResults?.cost && (
+                        <>
+                          <div className="mb-2"><span className="font-medium">Indicated Value: </span>${generatedReport.valuationResults.cost.indicatedValue?.toLocaleString()}</div>
+                          <div className="mb-2"><span className="font-medium">Land Value: </span>${generatedReport.valuationResults.cost.landValue?.toLocaleString()}</div>
+                          <div className="mb-2"><span className="font-medium">Cost New: </span>${generatedReport.valuationResults.cost.costNew?.toLocaleString()}</div>
+                          <div className="mb-2"><span className="font-medium">Total Depreciation: </span>${generatedReport.valuationResults.cost.totalDepreciation?.toLocaleString()}</div>
+                        </>
+                      )}
                       <div className="mb-2">
-                        <span className="font-medium">Cost Approach Data:</span>
+                        <span className="font-medium">Cost Approach Data (JSON):</span>
                         {editState['costApproach'] ? (
                           <>
                             <textarea
@@ -914,15 +965,15 @@ export default function ValuGenForm() {
                               <Button size="sm" onClick={async () => {
                                 try {
                                   const parsed = JSON.parse(editValue['costApproach'] ?? '');
-                                  const updatedCaseFile = await saveCostApproachData(lastCaseFile, parsed);
+                                    const updatedCaseFile = await saveCostApproachData(lastCaseFile!, parsed); 
                                   setLastCaseFile(updatedCaseFile);
-                                  setGeneratedReport(prev => prev ? {
+                                    setGeneratedReport(prev => prev ? ({
                                     ...prev,
                                     valuationResults: {
-                                      ...prev.valuationResults,
+                                      ...(prev.valuationResults || {}),
                                       cost: parsed,
                                     },
-                                  } : prev);
+                                    }) : prev);
                                   setEditState(s => ({ ...s, costApproach: false }));
                                   setEditError(e => ({ ...e, costApproach: null }));
                                   // Auto-regenerate reconciliation
@@ -932,11 +983,11 @@ export default function ValuGenForm() {
                                       userRationale: values.userRationale || '',
                                       finalUserValue: Number(values.finalUserValue) || 0,
                                     });
-                                    setGeneratedReport(prev => prev ? {
+                                      setGeneratedReport(prev => prev ? ({
                                       ...prev,
-                                      reconcilementOfOpinion: regen.narrative,
+                                      narratives: { ...(prev.narratives || {}), reconciliation: regen.narrative },
                                       valuationResults: { ...(prev.valuationResults || {}), reconciliation: regen.output },
-                                    } : prev);
+                                      }) : prev);
                                     toast ? toast.success('Reconciliation updated after Cost Approach edit!') : alert('Reconciliation updated after Cost Approach edit!');
                                   } catch (e) {
                                     toast ? toast.error('Failed to update Reconciliation after Cost Approach edit.') : alert('Failed to update Reconciliation after Cost Approach edit.');
@@ -944,33 +995,33 @@ export default function ValuGenForm() {
                                   // After reconciliation regeneration, update Executive Summary and Cover Letter
                                   try {
                                     const exec = await regenerateExecutiveSummarySection(updatedCaseFile);
-                                    setGeneratedReport(prev => prev ? {
+                                      setGeneratedReport(prev => prev ? ({
                                       ...prev,
-                                      executiveSummary: exec.narrative,
-                                    } : prev);
-                                    toast ? toast.success('Executive Summary updated!') : alert('Executive Summary updated!');
-                                  } catch (e) {
-                                    toast ? toast.error('Failed to update Executive Summary.') : alert('Failed to update Executive Summary.');
-                                  }
-                                  try {
-                                    const cover = await regenerateCoverLetterSection(updatedCaseFile);
-                                    setGeneratedReport(prev => prev ? {
-                                      ...prev,
-                                      coverLetter: cover.narrative,
-                                    } : prev);
-                                    toast ? toast.success('Cover Letter updated!') : alert('Cover Letter updated!');
-                                  } catch (e) {
-                                    toast ? toast.error('Failed to update Cover Letter.') : alert('Failed to update Cover Letter.');
-                                  }
-                                  try {
-                                    const compliance = await regenerateComplianceCheckSection(updatedCaseFile);
-                                    setGeneratedReport(prev => prev ? {
-                                      ...prev,
-                                      complianceReport: compliance,
-                                    } : prev);
-                                    toast ? toast.success('Compliance Check updated!') : alert('Compliance Check updated!');
-                                  } catch (e) {
-                                    toast ? toast.error('Failed to update Compliance Check.') : alert('Failed to update Compliance Check.');
+                                      narratives: { ...(prev.narratives || {}), executiveSummary: exec.narrative },
+                                      }) : prev);
+                                      toast ? toast.success('Executive Summary updated!') : alert('Executive Summary updated!');
+                                    } catch (e) {
+                                      toast ? toast.error('Failed to update Executive Summary.') : alert('Failed to update Executive Summary.');
+                                    }
+                                    try {
+                                      const cover = await regenerateCoverLetterSection(updatedCaseFile);
+                                      setGeneratedReport(prev => prev ? ({
+                                        ...prev,
+                                        narratives: { ...(prev.narratives || {}), coverLetter: cover.narrative },
+                                      }) : prev);
+                                      toast ? toast.success('Cover Letter updated!') : alert('Cover Letter updated!');
+                                    } catch (e) {
+                                      toast ? toast.error('Failed to update Cover Letter.') : alert('Failed to update Cover Letter.');
+                                    }
+                                    try {
+                                      const compliance = await regenerateComplianceCheckSection(updatedCaseFile);
+                                      setGeneratedReport(prev => prev ? ({
+                                        ...prev,
+                                        complianceCheckOutput: compliance,
+                                      }) : prev);
+                                      toast ? toast.success('Compliance Check updated!') : alert('Compliance Check updated!');
+                                    } catch (e) {
+                                      toast ? toast.error('Failed to update Compliance Check.') : alert('Failed to update Compliance Check.');
                                   }
                                 } catch (err) {
                                   setEditError(e => ({ ...e, costApproach: 'Invalid JSON or failed to save' }));
@@ -992,15 +1043,16 @@ export default function ValuGenForm() {
                         setRegenLoading('cost');
                         try {
                           const values = form.getValues();
-                          const regen = await regenerateCostApproachSection(lastCaseFile, {
+                          const regen = await regenerateCostApproachSection(lastCaseFile!, { 
                             landValue: Number(values.landValue) || 0,
                             costNew: Number(values.costNew) || 0,
                             totalDepreciation: Number(values.totalDepreciation) || 0,
                           });
-                          setGeneratedReport(prev => prev ? {
+                          setGeneratedReport(prev => prev ? ({
                             ...prev,
+                            narratives: { ...(prev.narratives || {}), costApproach: regen.narrative }, 
                             valuationResults: { ...(prev.valuationResults || {}), cost: regen.output },
-                          } : prev);
+                          }) : prev);
                           toast ? toast.success('Cost Approach regenerated!') : alert('Cost Approach regenerated!');
                         } catch (e) {
                           toast ? toast.error('Failed to regenerate Cost Approach.') : alert('Failed to regenerate Cost Approach.');
@@ -1016,9 +1068,9 @@ export default function ValuGenForm() {
                 {/* Reconciliation */}
                 <div>
                   <h3 className="text-lg font-semibold mb-2 flex items-center"><Scale className="h-5 w-5 mr-2" />Reconciliation</h3>
-                  {generatedReport.reconcilementOfOpinion ? (
+                  {generatedReport.narratives?.reconciliation ? (
                     <>
-                      <div className="mb-2"><span className="font-medium">Narrative: </span>{generatedReport.reconcilementOfOpinion}</div>
+                      <p className="mb-2 text-sm text-foreground whitespace-pre-wrap">{generatedReport.narratives.reconciliation}</p>
                       {generatedReport.valuationResults?.reconciliation?.finalReconciledValue && (
                         <div className="mb-2"><span className="font-medium">Final Reconciled Value: </span>${generatedReport.valuationResults.reconciliation.finalReconciledValue.toLocaleString()}</div>
                       )}
@@ -1026,15 +1078,15 @@ export default function ValuGenForm() {
                         setRegenLoading('reconciliation');
                         try {
                           const values = form.getValues();
-                          const regen = await regenerateReconciliationSection(lastCaseFile, {
+                          const regen = await regenerateReconciliationSection(lastCaseFile!, { 
                             userRationale: values.userRationale || '',
                             finalUserValue: Number(values.finalUserValue) || 0,
                           });
-                          setGeneratedReport(prev => prev ? {
+                          setGeneratedReport(prev => prev ? ({
                             ...prev,
-                            reconcilementOfOpinion: regen.narrative,
+                            narratives: { ...(prev.narratives || {}), reconciliation: regen.narrative },
                             valuationResults: { ...(prev.valuationResults || {}), reconciliation: regen.output },
-                          } : prev);
+                          }) : prev);
                           toast ? toast.success('Reconciliation regenerated!') : alert('Reconciliation regenerated!');
                         } catch (e) {
                           toast ? toast.error('Failed to regenerate Reconciliation.') : alert('Failed to regenerate Reconciliation.');

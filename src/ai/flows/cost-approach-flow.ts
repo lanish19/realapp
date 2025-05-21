@@ -185,16 +185,25 @@ export const costApproachFlow = ai.defineFlow(
         console.warn("CostApproachFlow: Building size is missing and no RCN/SF provided by user. RCN calculation might be impaired.");
     }
 
-    const prompt = assembleCostApproachPrompt(caseFile, userInputs);
+    const promptText = assembleCostApproachPrompt(caseFile, userInputs);
 
-    const costGeneration = await ai.generate({
-      prompt,
+    // Define the prompt object for consistency
+    const costApproachAnalysisPrompt = ai.definePrompt({
+      name: 'costApproachAnalysisPrompt',
+      inputSchema: CostApproachInputSchema, // The input to the flow is suitable here
       output: { schema: CostApproachOutputSchema },
-      tools: [googleSearch], 
+      prompt: '', // Dynamic prompt text will be supplied in runPrompt
+      tools: [googleSearch],
       toolChoice: 'auto',
     });
 
-    const output = costGeneration.output();
+    const { output } = await ai.runPrompt({
+      prompt: costApproachAnalysisPrompt, // Pass the defined prompt object
+      input: input, // Pass the original flow input
+      promptText: promptText, // Supply the dynamically generated prompt text
+    });
+
+    // const output = costGeneration.output(); // output is directly from runPrompt
     if (!output) {
       throw new Error("AI failed to generate Cost Approach output or output was empty.");
     }
