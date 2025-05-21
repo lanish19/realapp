@@ -105,6 +105,18 @@ export const PreliminaryComparableSaleSchema = z.object({
   confidenceScore: z.number(),
 });
 
+// Define the enum for status flags
+export const StatusFlagEnum = z.enum([
+    'approved', 
+    'lowConfidence', 
+    'pending', 
+    'error', 
+    'success', 
+    'skipped_no_comps',
+    'not_applicable', // Added based on common needs
+    'in_progress'     // Added based on common needs
+]);
+
 // Centralized AppraisalCaseFile schema for all appraisal data
 export const AppraisalCaseFileSchema = z.object({
   // Initial user inputs
@@ -204,7 +216,7 @@ export const AppraisalCaseFileSchema = z.object({
 
   confidenceScoresOverall: z.record(z.number()).optional(),
   
-  statusFlags: z.record(z.string()).optional(),
+  statusFlags: z.record(StatusFlagEnum).optional(),
 
   userReconciliationInputs: z.object({
     rationale: z.string().optional(),

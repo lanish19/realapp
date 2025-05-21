@@ -68,12 +68,9 @@ export const complianceCheckFlow = defineFlow({
   outputSchema: ComplianceCheckOutputSchema,
   async run({
     input,
-    // tools, // Not directly used for this type of analytical review flow
-    // context,
   }: {
     input: ComplianceCheckInput;
-    tools: any; // Replace with specific Genkit tools type if available
-    context: any; // Replace with specific Genkit context type if available
+    // tools and context were previously here but are unused in this flow's run method
   }) {
     // Define the prompt object
     const complianceCheckAnalysisPrompt = ai.definePrompt({

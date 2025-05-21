@@ -168,9 +168,20 @@ export async function regenerateCostApproachSection(caseFile: AppraisalCaseFile,
 }
 
 export async function regenerateReconciliationSection(caseFile: AppraisalCaseFile, params: { userRationale: string; finalUserValue: number }) {
+  const updatedCaseFile: AppraisalCaseFile = {
+      ...caseFile,
+      userReconciliationInputs: {
+          ...(caseFile.userReconciliationInputs || {}), // Preserve existing fields if any
+          rationale: params.userRationale,
+          finalValueOpinion: params.finalUserValue,
+      }
+  };
+
   const result = await reconciliationFlow({
-    appraisalCaseFile: caseFile,
-    ...params,
+    appraisalCaseFile: updatedCaseFile,
+    salesComparisonApproach: updatedCaseFile.valuationResults?.salesComparisonApproach,
+    incomeApproach: updatedCaseFile.valuationResults?.incomeApproach,
+    costApproach: updatedCaseFile.valuationResults?.costApproach,
   });
   return {
     narrative: result.narrative,

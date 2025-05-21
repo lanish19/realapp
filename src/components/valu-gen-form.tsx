@@ -827,8 +827,29 @@ export default function ValuGenForm() {
                               <div className="flex gap-2 mt-2">
                                 <Button size="sm" onClick={() => setEditState(s => ({ ...s, incomeProForma: false }))}>Cancel</Button>
                                 <Button size="sm" onClick={async () => {
+                                  const incomeProFormaString = editValue['incomeProForma'];
+                                  let parsed = null;
+
+                                  if (incomeProFormaString && incomeProFormaString.trim() !== '') {
+                                      try {
+                                          parsed = JSON.parse(incomeProFormaString);
+                                          setEditError(e => ({ ...e, incomeProForma: null })); // Clear previous error
+                                      } catch (err) {
+                                          setEditError(e => ({ ...e, incomeProForma: 'Invalid JSON format.' }));
+                                          return; // Prevent further execution
+                                      }
+                                  } else {
+                                      setEditError(e => ({ ...e, incomeProForma: 'Income pro forma data cannot be empty.' }));
+                                      return; // Prevent further execution
+                                  }
+                                  
+                                  // Ensure parsed is not null before proceeding (should be caught by above logic, but good safeguard)
+                                  if (parsed === null) {
+                                      setEditError(e => ({ ...e, incomeProForma: 'An unexpected error occurred with parsing pro forma data.'}));
+                                      return;
+                                  }
+
                                   try {
-                                    const parsed = JSON.parse(editValue['incomeProForma'] ?? '');
                                     const updatedCaseFile = await saveIncomeProForma(lastCaseFile!, parsed); 
                                     setLastCaseFile(updatedCaseFile);
                                     setGeneratedReport(prev => prev ? ({
@@ -963,8 +984,29 @@ export default function ValuGenForm() {
                             <div className="flex gap-2 mt-2">
                               <Button size="sm" onClick={() => setEditState(s => ({ ...s, costApproach: false }))}>Cancel</Button>
                               <Button size="sm" onClick={async () => {
+                                const costApproachString = editValue['costApproach'];
+                                let parsed = null;
+
+                                if (costApproachString && costApproachString.trim() !== '') {
+                                    try {
+                                        parsed = JSON.parse(costApproachString);
+                                        setEditError(e => ({ ...e, costApproach: null })); // Clear previous error
+                                    } catch (err) {
+                                        setEditError(e => ({ ...e, costApproach: 'Invalid JSON format.' }));
+                                        return; // Prevent further execution
+                                    }
+                                } else {
+                                    setEditError(e => ({ ...e, costApproach: 'Cost approach data cannot be empty.' }));
+                                    return; // Prevent further execution
+                                }
+
+                                // Ensure parsed is not null before proceeding
+                                if (parsed === null) {
+                                    setEditError(e => ({...e, costApproach: 'An unexpected error occurred with parsing cost approach data.'}));
+                                    return;
+                                }
+
                                 try {
-                                  const parsed = JSON.parse(editValue['costApproach'] ?? '');
                                     const updatedCaseFile = await saveCostApproachData(lastCaseFile!, parsed); 
                                   setLastCaseFile(updatedCaseFile);
                                     setGeneratedReport(prev => prev ? ({
